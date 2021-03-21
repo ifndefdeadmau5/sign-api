@@ -2,7 +2,8 @@ const { ApolloServer, gql } = require("apollo-server");
 const { Client } = require("pg");
 
 const client = new Client({
-  connectionString: process.env.DATABASE_URL,
+  connectionString:
+    process.env.DATABASE_URL || "postgresql://alucard@localhost:5432/alucard",
   ssl: {
     rejectUnauthorized: false,
   },
@@ -10,47 +11,46 @@ const client = new Client({
 
 client.connect();
 
-client.query(
-  "SELECT table_schema,table_name FROM information_schema.tables;",
-  (err, res) => {
-    if (err) throw err;
-    for (let row of res.rows) {
-      console.log(JSON.stringify(row));
-    }
-    client.end();
-  }
-);
-
 const typeDefs = gql`
-  type Book {
-    title: String
-    author: String
+  type Survey {
+    id: ID
+    name: String!
+    result: String!
+    signatureDataUrl: String!
   }
 
   type User {
-    id: ID
-    email: String
-    password: String
+    id: ID!
+    email: String!
+    password: String!
   }
 
   type Query {
-    books: [Book]
+    surveys: [Survey!]!
+    survey(id: ID!): Survey!
   }
 `;
-const books = [
-  {
-    title: "The Awakening",
-    author: "Kate Chopin",
-  },
-  {
-    title: "City of Glass",
-    author: "Paul Auster",
-  },
-];
 
 const resolvers = {
   Query: {
-    books: () => books,
+    surveys: async () => {
+      try {
+        const res = await client.query("SELECT * FROM surveys");
+        return res.rows;
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
+    survey: async (_, args) => {
+      try {
+        const res = await client.query("SELECT * FROM surveys where id = $1", [
+          args.id,
+        ]);
+        return res.rows[0];
+      } catch (err) {
+        console.log(err.stack);
+      }
+    },
   },
 };
 
