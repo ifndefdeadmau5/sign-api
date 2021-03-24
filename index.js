@@ -1,5 +1,19 @@
-const { ApolloServer, gql } = require("apollo-server");
+const express = require("express");
+const { ApolloServer, gql } = require("apollo-server-express");
+const jwt = require("express-jwt");
+const jsonwebtoken = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 const { Client } = require("pg");
+
+const app = new express();
+
+app.use(
+  jwt({
+    secret: process.env.JWT_SECRET,
+    credentialsRequired: false,
+    algorithms: ["HS256"],
+  })
+);
 
 const client = new Client({
   connectionString:
@@ -28,6 +42,7 @@ const typeDefs = gql`
   type User {
     id: ID!
     email: String!
+    username: String
     password: String!
   }
 
@@ -47,6 +62,8 @@ const typeDefs = gql`
 
   type Mutation {
     addSurvey(input: SurveyInput!): Survey
+    login(email: String!, password: String!): User
+    signUp(email: String!, password: String!, username: String): Boolean
   }
 `;
 
@@ -72,6 +89,70 @@ const resolvers = {
     },
   },
   Mutation: {
+    signUp: async (root, { email, password, username = "noname" }, { res }) => {
+      const text = `INSERT INTO accounts(email, username, password) VALUES($1, $2, $3) RETURNING *`;
+      const values = [email, username, await bcrypt.hash(password, 10)];
+
+      try {
+        const result = await client.query(text, values);
+
+        const token = jsonwebtoken.sign(
+          {
+            id: result.user_id,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1d" }
+        );
+
+        res.cookie("id", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        });
+        return true;
+      } catch (err) {
+        console.log(err.stack);
+        return false;
+      }
+    },
+    login: async (root, { email, password }, { res }) => {
+      try {
+        const result = await client.query(
+          "SELECT * FROM accounts where email = $1",
+          [email]
+        );
+        const [user] = result.rows;
+        console.log("user");
+        console.log(user);
+        if (!user) {
+          throw new Error("No user with that id");
+        }
+
+        const valid = await bcrypt.compare(password, user.password);
+
+        if (!valid) {
+          throw new Error("Incorrect password");
+        }
+
+        const token = jsonwebtoken.sign(
+          {
+            id: user.user_id,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1d" }
+        );
+
+        res.cookie("id", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        });
+        return user;
+      } catch (err) {
+        console.log(err.stack);
+        throw new Error("Could not login");
+      }
+    },
     addSurvey: async (
       root,
       {
@@ -79,13 +160,12 @@ const resolvers = {
           name,
           result,
           signatureDataUrl,
-          author,
+          // author,
           registrationNumber,
           gender,
           signedBy,
         },
-      },
-      { models }
+      }
     ) => {
       const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy") VALUES($1, $2, $3, 2, $4, $5, $6) RETURNING *`;
       const values = [
@@ -107,8 +187,24 @@ const resolvers = {
   },
 };
 
-const server = new ApolloServer({ typeDefs, resolvers });
-
-server.listen(process.env.PORT || 4000).then(({ url }) => {
-  console.log(`🚀  Server ready at ${url}`);
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context({ req, res }) {
+    return { req, res };
+  },
+  playground: true,
 });
+
+server.applyMiddleware({
+  app,
+  cors: {
+    credentials: true,
+    origin: ["http://localhost:3000", "https://sign-app-one.vercel.app"],
+  },
+});
+
+const port = process.env.PORT || 4000;
+app.listen(port, () =>
+  console.log(`🚀 Server ready at http://localhost:4000${server.graphqlPath}`)
+);
