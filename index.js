@@ -78,9 +78,12 @@ const typeDefs = gql`
 
 const resolvers = {
   Query: {
-    surveys: async () => {
+    surveys: async (_, args, { id }) => {
       try {
-        const res = await client.query("SELECT * FROM surveys");
+        const res = await client.query(
+          "SELECT * FROM surveys where author = $1",
+          [id]
+        );
         return res.rows;
       } catch (err) {
         console.log(err.stack);
@@ -131,8 +134,6 @@ const resolvers = {
           [email]
         );
         const [user] = result.rows;
-        console.log("user");
-        console.log(user);
         if (!user) {
           throw new Error("No user with that id");
         }
@@ -150,9 +151,6 @@ const resolvers = {
           process.env.JWT_SECRET,
           { expiresIn: "1d" }
         );
-
-        console.log("process.env.NODE_ENV");
-        console.log(process.env.NODE_ENV);
 
         res.cookie("id", token, {
           httpOnly: true,
@@ -173,18 +171,19 @@ const resolvers = {
           name,
           result,
           signatureDataUrl,
-          // author,
           registrationNumber,
           gender,
           signedBy,
         },
-      }
+      },
+      { id }
     ) => {
-      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy") VALUES($1, $2, $3, 2, $4, $5, $6) RETURNING *`;
+      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy") VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
       const values = [
         name,
         result,
         signatureDataUrl,
+        id,
         registrationNumber,
         gender,
         signedBy,
