@@ -150,10 +150,14 @@ const resolvers = {
           { expiresIn: "1d" }
         );
 
+        console.log("process.env.NODE_ENV");
+        console.log(process.env.NODE_ENV);
+
         res.cookie("id", token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+          sameSite: "none",
         });
         return user;
       } catch (err) {
