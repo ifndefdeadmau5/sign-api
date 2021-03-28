@@ -1,8 +1,13 @@
 const express = require("express");
-const { ApolloServer, gql } = require("apollo-server-express");
+const {
+  ApolloServer,
+  gql,
+  AuthenticationError,
+} = require("apollo-server-express");
 const jwt = require("express-jwt");
 const jsonwebtoken = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const cookieParser = require("cookie-parser");
 const { Client } = require("pg");
 
 const app = new express();
@@ -15,9 +20,12 @@ app.use(
   })
 );
 
+app.use(cookieParser());
+
 const client = new Client({
   connectionString:
-    process.env.DATABASE_URL || "postgresql://alucard@localhost:5432/alucard2",
+    process.env.DATABASE_URL ||
+    "postgresql://bagseongmin@localhost:5432/sign-app-db",
   ssl: {
     rejectUnauthorized: false,
   },
@@ -150,7 +158,7 @@ const resolvers = {
         return user;
       } catch (err) {
         console.log(err.stack);
-        throw new Error("Could not login");
+        throw new Error(err);
       }
     },
     addSurvey: async (
@@ -187,12 +195,25 @@ const resolvers = {
   },
 };
 
+const context = ({ req, res }) => {
+  if (req.body.operationName === "SignIn") {
+    return { req, res };
+  }
+  const token = req.cookies["id"] || "";
+  try {
+    const { id, email } = jsonwebtoken.verify(token, process.env.JWT_SECRET);
+    return { req, res, id, email };
+  } catch (e) {
+    throw new AuthenticationError(
+      "Authentication token is invalid, please log in"
+    );
+  }
+};
+
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  context({ req, res }) {
-    return { req, res };
-  },
+  context,
   playground: true,
 });
 
