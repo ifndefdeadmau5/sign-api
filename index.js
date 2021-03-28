@@ -23,9 +23,7 @@ app.use(
 app.use(cookieParser());
 
 const client = new Client({
-  connectionString:
-    process.env.DATABASE_URL ||
-    "postgresql://bagseongmin@localhost:5432/sign-app-db",
+  connectionString: process.env.DATABASE_URL,
   ssl:
     process.env.NODE_ENV === "production"
       ? {
