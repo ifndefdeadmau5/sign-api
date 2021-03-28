@@ -26,11 +26,12 @@ const client = new Client({
   connectionString:
     process.env.DATABASE_URL ||
     "postgresql://bagseongmin@localhost:5432/sign-app-db",
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  // Use { ssl: false } in development environment
-  // ssl: false,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? {
+          rejectUnauthorized: false,
+        }
+      : false,
 });
 
 client.connect();
@@ -157,7 +158,7 @@ const resolvers = {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-          sameSite: "none",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : false,
         });
         return user;
       } catch (err) {
