@@ -9,6 +9,18 @@ const jsonwebtoken = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
 const { Client } = require("pg");
+const { utcToZonedTime, zonedTimeToUtc } = require("date-fns-tz");
+const { startOfDay, endOfDay } = require("date-fns");
+
+function getDateParams(utcDate, timeZone) {
+  const timeZoneDate = utcToZonedTime(utcDate, timeZone);
+  const start = startOfDay(timeZoneDate);
+  const end = endOfDay(timeZoneDate);
+  const startUtc = zonedTimeToUtc(start, timeZone);
+  const endUtc = zonedTimeToUtc(end, timeZone);
+
+  return [startUtc, endUtc];
+}
 
 const app = new express();
 
@@ -43,6 +55,7 @@ const typeDefs = gql`
     result: String!
     signatureDataUrl: String!
     signedBy: String!
+    relationship: String!
     createdAt: String!
   }
 
@@ -54,7 +67,7 @@ const typeDefs = gql`
   }
 
   type Query {
-    surveys: [Survey!]!
+    surveys(createdAt: String): [Survey!]!
     survey(id: ID!): Survey!
   }
 
@@ -65,6 +78,7 @@ const typeDefs = gql`
     result: String!
     signatureDataUrl: String!
     signedBy: String!
+    relationship: String!
   }
 
   type Mutation {
@@ -76,11 +90,12 @@ const typeDefs = gql`
 
 const resolvers = {
   Query: {
-    surveys: async (_, args, { id }) => {
+    surveys: async (_, { createdAt }, { id }) => {
+      const [start, end] = getDateParams(createdAt, "Asia/Seoul");
       try {
         const res = await client.query(
-          "SELECT * FROM surveys where author = $1",
-          [id]
+          `SELECT * FROM surveys where author = $1 AND "createdAt" BETWEEN $2 AND $3`,
+          [id, start, end]
         );
         return res.rows;
       } catch (err) {
@@ -172,11 +187,12 @@ const resolvers = {
           registrationNumber,
           gender,
           signedBy,
+          relationship,
         },
       },
       { id }
     ) => {
-      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy") VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
+      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy", relationship) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
       const values = [
         name,
         result,
@@ -185,6 +201,7 @@ const resolvers = {
         registrationNumber,
         gender,
         signedBy,
+        relationship,
       ];
 
       try {
