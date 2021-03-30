@@ -47,8 +47,17 @@ const client = new Client({
 client.connect();
 
 const typeDefs = gql`
+  enum SurveyType {
+    A
+    B
+    C
+  }
+
   type Survey {
     id: ID
+    type: SurveyType
+    doctor: String
+    operation: String
     name: String!
     registrationNumber: String!
     gender: String!
@@ -73,6 +82,9 @@ const typeDefs = gql`
 
   input SurveyInput {
     name: String!
+    type: SurveyType!
+    doctor: String
+    operation: String
     registrationNumber: String!
     gender: String!
     result: String!
@@ -188,11 +200,14 @@ const resolvers = {
           gender,
           signedBy,
           relationship,
+          type,
+          operation,
+          doctor,
         },
       },
       { id }
     ) => {
-      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy", relationship) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
+      const text = `INSERT INTO surveys(name, result, "signatureDataUrl", author, "registrationNumber", gender, "signedBy", relationship, type, operation, doctor) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`;
       const values = [
         name,
         result,
@@ -202,6 +217,9 @@ const resolvers = {
         gender,
         signedBy,
         relationship,
+        type,
+        operation,
+        doctor,
       ];
 
       try {
