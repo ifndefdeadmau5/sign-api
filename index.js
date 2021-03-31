@@ -76,7 +76,11 @@ const typeDefs = gql`
   }
 
   type Query {
-    surveys(createdAt: String): [Survey!]!
+    surveys(
+      createdAt: String
+      name: String
+      registrationNumber: String
+    ): [Survey!]!
     survey(id: ID!): Survey!
   }
 
@@ -102,12 +106,22 @@ const typeDefs = gql`
 
 const resolvers = {
   Query: {
-    surveys: async (_, { createdAt }, { id }) => {
+    surveys: async (_, { createdAt, name, registrationNumber }, { id }) => {
       const [start, end] = getDateParams(createdAt, "Asia/Seoul");
+      const values = [id, start, end];
+
+      if (name) values.push(name);
+      if (registrationNumber) values.push(registrationNumber);
       try {
         const res = await client.query(
-          `SELECT * FROM surveys where author = $1 AND "createdAt" BETWEEN $2 AND $3`,
-          [id, start, end]
+          `SELECT * FROM surveys where author = $1 AND "createdAt" BETWEEN $2 AND $3 ${
+            name ? `AND name LIKE '%' || $4 || '%'` : ""
+          } ${
+            registrationNumber
+              ? `AND "registrationNumber" LIKE '%' || $${name ? 5 : 4} || '%'`
+              : ""
+          }  `,
+          values
         );
         return res.rows;
       } catch (err) {
