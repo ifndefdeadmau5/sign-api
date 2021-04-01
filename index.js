@@ -99,7 +99,7 @@ const typeDefs = gql`
 
   type Mutation {
     addSurvey(input: SurveyInput!): Survey
-    login(email: String!, password: String!): User
+    login(email: String!, password: String!): String
     signUp(email: String!, password: String!, username: String): Boolean
   }
 `;
@@ -197,7 +197,7 @@ const resolvers = {
           maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
           sameSite: process.env.NODE_ENV === "production" ? "none" : false,
         });
-        return user;
+        return token;
       } catch (err) {
         console.log(err.stack);
         throw new Error(err);
