@@ -4,7 +4,6 @@ const {
   gql,
   AuthenticationError,
 } = require("apollo-server-express");
-const jwt = require("express-jwt");
 const jsonwebtoken = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
@@ -23,14 +22,6 @@ function getDateParams(utcDate, timeZone) {
 }
 
 const app = new express();
-
-app.use(
-  jwt({
-    secret: process.env.JWT_SECRET,
-    credentialsRequired: false,
-    algorithms: ["HS256"],
-  })
-);
 
 app.use(cookieParser());
 
@@ -247,7 +238,7 @@ const resolvers = {
 };
 
 const context = ({ req, res }) => {
-  if (req.body.operationName === "SignIn") {
+  if (["SignIn", "SignUp"].includes(req.body.operationName)) {
     return { req, res };
   }
   const token = req.cookies["id"] || "";
